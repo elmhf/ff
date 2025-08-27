@@ -1,49 +1,52 @@
 from app.celery_app import celery
 from app.services.job_status import JobStatusManager
 from app.services.supabase_manager import update_report_status
+from app import create_app
 
 
 @celery.task(bind=True, name='aggregate_medical_results')
 def aggregate_medical_results_task(self, results_list):
     task_id = self.request.id
     try:
-        JobStatusManager.create_or_update_status(task_id, 'processing', 'Aggregating results...', 90)
+        app = create_app()
+        with app.app_context():
+            JobStatusManager.create_or_update_status(task_id, 'processing', 'Aggregating results...', 90)
 
-        if isinstance(results_list, dict):
-            try:
-                results_list = [results_list[k] for k in sorted(results_list.keys())]
-            except Exception:
-                results_list = list(results_list.values())
-        elif not isinstance(results_list, list):
-            results_list = [results_list]
+            if isinstance(results_list, dict):
+                try:
+                    results_list = [results_list[k] for k in sorted(results_list.keys())]
+                except Exception:
+                    results_list = list(results_list.values())
+            elif not isinstance(results_list, list):
+                results_list = [results_list]
 
-        def safe_get(d, key, default=None):
-            return d.get(key, default) if isinstance(d, dict) else default
+            def safe_get(d, key, default=None):
+                return d.get(key, default) if isinstance(d, dict) else default
 
-        validation_result = results_list[0] if len(results_list) > 0 else {}
-        ai_result = results_list[1] if len(results_list) > 1 else {}
-        upload_result = results_list[2] if len(results_list) > 2 else {}
+            validation_result = results_list[0] if len(results_list) > 0 else {}
+            ai_result = results_list[1] if len(results_list) > 1 else {}
+            upload_result = results_list[2] if len(results_list) > 2 else {}
 
-        report_id = (safe_get(validation_result, 'report_id') or
-                     safe_get(ai_result, 'report_id') or
-                     safe_get(upload_result, 'report_id'))
+            report_id = (safe_get(validation_result, 'report_id') or
+                         safe_get(ai_result, 'report_id') or
+                         safe_get(upload_result, 'report_id'))
 
-        final_result = {
-            'status': 'completed',
-            'message': 'Medical file processing completed successfully',
-            'validation_result': validation_result,
-            'ai_result': safe_get(ai_result, 'ai_result'),
-            'upload_result': safe_get(upload_result, 'upload_result'),
-            'processing_result': safe_get(upload_result, 'processing_result'),
-            'upload_id': safe_get(upload_result, 'upload_id') or safe_get(validation_result, 'upload_id'),
-            'workflow_completed': True
-        }
+            final_result = {
+                'status': 'completed',
+                'message': 'Medical file processing completed successfully',
+                'validation_result': validation_result,
+                'ai_result': safe_get(ai_result, 'ai_result'),
+                'upload_result': safe_get(upload_result, 'upload_result'),
+                'processing_result': safe_get(upload_result, 'processing_result'),
+                'upload_id': safe_get(upload_result, 'upload_id') or safe_get(validation_result, 'upload_id'),
+                'workflow_completed': True
+            }
 
-        if report_id:
-            update_report_status(report_id, "completed")
+            if report_id:
+                update_report_status(report_id, "completed")
 
-        JobStatusManager.create_or_update_status(task_id, 'completed', 'Workflow completed', 100, final_result)
-        return final_result
+            JobStatusManager.create_or_update_status(task_id, 'completed', 'Workflow completed', 100, final_result)
+            return final_result
     except Exception as e:
         error_msg = f"Aggregation error: {str(e)}"
         JobStatusManager.create_or_update_status(task_id, 'failed', error_msg, 0)
