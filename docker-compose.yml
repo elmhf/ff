@@ -1,0 +1,137 @@
+version: '3.8'
+
+services:
+  # Redis service
+  redis:
+    image: redis:7-alpine
+    container_name: medical_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - medical_network
+
+  # Flask web application
+  web:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: medical_web
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_ENV=production
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SECRET_KEY=your_secret_key_here
+      - SUPABASE_URL=https://intukonwqiiyokuagplg.supabase.co
+      - SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImludHVrb253cWlpeW9rdWFncGxnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MjkzNTExMCwiZXhwIjoyMDY4NTExMTEwfQ.YdnqRdR4p34tci74mQhBR7Xtplh3cdUdnaDDRodutIY
+      - PYTHONPATH=/app
+    volumes:
+      - app_uploads:/app/uploads
+      - app_cache:/app/cache_slices
+      - app_processed:/app/processed
+      - app_data:/app/data
+      - ./taskes:/app/taskes
+      - .:/app/src
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      interval: 40s
+      timeout: 10s
+      retries: 3
+    networks:
+      - medical_network
+
+  # Celery worker
+  celery_worker:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: medical_celery_worker
+    command: ["celery", "-A", "app.celery_app.celery", "worker", "--loglevel=info", "--concurrency=4"]
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SECRET_KEY=your_secret_key_here
+      - SUPABASE_URL=https://intukonwqiiyokuagplg.supabase.co
+      - SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImludHVrb253cWlpeW9rdWFncGxnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MjkzNTExMCwiZXhwIjoyMDY4NTExMTEwfQ.YdnqRdR4p34tci74mQhBR7Xtplh3cdUdnaDDRodutIY
+      - PYTHONPATH=/app
+    volumes:
+      - app_uploads:/app/uploads
+      - app_cache:/app/cache_slices
+      - app_processed:/app/processed
+      - app_data:/app/data
+      - ./taskes:/app/taskes
+      - .:/app/src
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - medical_network
+
+  # Celery Beat (for scheduled tasks)
+  celery_beat:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: medical_celery_beat
+    command: ["celery", "-A", "app.celery_app.celery", "beat", "--loglevel=info"]
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SECRET_KEY=your_secret_key_here
+      - PYTHONPATH=/app
+    volumes:
+      - ./taskes:/app/taskes
+      - .:/app/src
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - medical_network
+
+  # Flower (Celery monitoring - optional)
+  flower:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: medical_flower
+    command: ["celery", "-A", "app.celery_app.celery", "flower", "--port=5555"]
+    ports:
+      - "5555:5555"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - PYTHONPATH=/app
+    volumes:
+      - ./taskes:/app/taskes
+      - .:/app/src
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - medical_network
+
+volumes:
+  redis_data:
+  app_uploads:
+  app_cache:
+  app_processed:
+  app_data:
+
+networks:
+  medical_network:
+    driver: bridge
