@@ -237,9 +237,33 @@ def upload_medical_slices_task(self, processing_result, clinic_id, patient_id, r
                     'processing_result': processing_result
                 }
             
-            # Simulate upload process
-            import time
-            time.sleep(2)
+            # Get slice counts from processing result
+            processing_data = processing_result.get('processing_result', {})
+            slice_counts = processing_data.get('slice_counts', {})
+            
+            if not slice_counts or sum(slice_counts.values()) == 0:
+                logger.warning("No slices to upload")
+                return {
+                    'status': 'skipped',
+                    'message': 'No slices to upload',
+                    'processing_result': processing_result
+                }
+            
+            # Use SupabaseUploadManager to upload slices
+            try:
+                upload_manager = SupabaseUploadManager(task_id=task_id)
+                upload_result = upload_manager.upload_all_slices(
+                    slice_counts, clinic_id, patient_id, report_type, report_id, self
+                )
+                
+                if upload_result.get('total_uploaded', 0) > 0:
+                    logger.info(f"Successfully uploaded {upload_result['total_uploaded']} slices")
+                else:
+                    logger.warning("No slices were uploaded successfully")
+                    
+            except Exception as e:
+                logger.error(f"Slice upload error: {e}")
+                raise Exception(f"Slice upload failed: {e}")
             
             # Update status to uploaded
             if report_id:
@@ -247,12 +271,13 @@ def upload_medical_slices_task(self, processing_result, clinic_id, patient_id, r
             
             result = {
                 'status': 'uploaded',
-                'message': 'Medical slices uploaded successfully',
+                'message': f'Medical slices uploaded successfully - {upload_result.get("total_uploaded", 0)} slices uploaded',
                 'clinic_id': clinic_id,
                 'patient_id': patient_id,
                 'report_type': report_type,
                 'report_id': report_id,
-                'processing_result': processing_result
+                'processing_result': processing_result,
+                'upload_result': upload_result
             }
             JobStatusManager.create_or_update_status(task_id, 'completed', 'Medical slices uploaded', 100, result)
             return result
