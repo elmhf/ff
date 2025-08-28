@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 @celery.task(bind=True, name='upload_medical_slices')
-def upload_medical_slices_task(self, clinic_id, patient_id, report_type, report_id):
+def upload_medical_slices_task(self, processing_result, clinic_id, patient_id, report_type, report_id):
     task_id = self.request.id
     try:
         app = create_app()
@@ -17,6 +17,15 @@ def upload_medical_slices_task(self, clinic_id, patient_id, report_type, report_
                 update_report_status(report_id, "upload_started")
             
             JobStatusManager.create_or_update_status(task_id, 'processing', 'Uploading medical slices...', 60)
+            
+            # Check if processing was successful
+            if not processing_result or processing_result.get('status') != 'processed':
+                logger.warning("Processing not completed, skipping upload")
+                return {
+                    'status': 'skipped',
+                    'message': 'Processing not completed, skipping upload',
+                    'processing_result': processing_result
+                }
             
             # Simulate upload process
             import time
@@ -32,7 +41,8 @@ def upload_medical_slices_task(self, clinic_id, patient_id, report_type, report_
                 'clinic_id': clinic_id,
                 'patient_id': patient_id,
                 'report_type': report_type,
-                'report_id': report_id
+                'report_id': report_id,
+                'processing_result': processing_result
             }
             JobStatusManager.create_or_update_status(task_id, 'completed', 'Medical slices uploaded', 100, result)
             return result
