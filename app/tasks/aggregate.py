@@ -10,8 +10,8 @@ def aggregate_medical_results_task(self, results_list):
     try:
         app = create_app()
         with app.app_context():
-            JobStatusManager.create_or_update_status(task_id, 'processing', 'Aggregating results...', 90)
-
+            # Update status to aggregation started
+            report_id = None
             if isinstance(results_list, dict):
                 try:
                     results_list = [results_list[k] for k in sorted(results_list.keys())]
@@ -30,6 +30,12 @@ def aggregate_medical_results_task(self, results_list):
             report_id = (safe_get(validation_result, 'report_id') or
                          safe_get(ai_result, 'report_id') or
                          safe_get(upload_result, 'report_id'))
+            
+            # Update status to aggregation started
+            if report_id:
+                update_report_status(report_id, "aggregation_started")
+            
+            JobStatusManager.create_or_update_status(task_id, 'processing', 'Aggregating results...', 90)
 
             final_result = {
                 'status': 'completed',
@@ -42,6 +48,7 @@ def aggregate_medical_results_task(self, results_list):
                 'workflow_completed': True
             }
 
+            # Update status to completed
             if report_id:
                 update_report_status(report_id, "completed")
 
@@ -49,6 +56,9 @@ def aggregate_medical_results_task(self, results_list):
             return final_result
     except Exception as e:
         error_msg = f"Aggregation error: {str(e)}"
+        # Update status to aggregation failed
+        if report_id:
+            update_report_status(report_id, "aggregation_failed")
         JobStatusManager.create_or_update_status(task_id, 'failed', error_msg, 0)
         self.update_state(state='FAILURE', meta={'error': error_msg})
         raise Exception(error_msg)

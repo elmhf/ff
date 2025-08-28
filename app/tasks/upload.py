@@ -17,16 +17,24 @@ def upload_medical_slices_task(self, processing_result, clinic_id, patient_id, r
                     'message': 'Upload parameters not provided',
                     'processing_result': processing_result
                 }
+            
+            # Update status to upload started
+            if report_id:
+                update_report_status(report_id, "upload_started")
+            
             JobStatusManager.create_or_update_status(task_id, 'processing', 'Uploading slices...', 30)
             slice_counts = processing_result['processing_result'].get('slice_counts', {})
+            
             if sum(slice_counts.values()) > 0:
                 upload_manager = SupabaseUploadManager(task_id=task_id)
                 upload_result = upload_manager.upload_all_slices(
                     slice_counts, clinic_id, patient_id, report_type, report_id, self
                 )
+                # Update status to uploaded
                 update_report_status(report_id, "uploaded")
             else:
                 upload_result = None
+            
             result = {
                 'status': 'uploaded',
                 'upload_result': upload_result,

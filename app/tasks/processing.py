@@ -17,7 +17,13 @@ def process_medical_file_task(self, validation_result, upload_id):
             report_id = validation_result.get('report_id')
             file_path = file_info['path']
             filename = file_info['filename']
+            
+            # Update status to processing started
+            if report_id:
+                update_report_status(report_id, "processing_started")
+            
             JobStatusManager.create_or_update_status(task_id, 'processing', 'Processing medical file...', 20)
+            
             if filename.lower().endswith(('.nii', '.nii.gz')):
                 processor = NIfTIProcessor(task_id=task_id)
                 processing_result = processor.process_file(file_path, upload_id, self)
@@ -25,8 +31,11 @@ def process_medical_file_task(self, validation_result, upload_id):
                 processor = DICOMProcessor(task_id=task_id)
                 upload_dir = os.path.dirname(file_path)
                 processing_result = processor.process_directory(upload_dir, upload_id, self)
+            
+            # Update status to processed
             if report_id:
                 update_report_status(report_id, "processed")
+            
             result = {
                 'status': 'processed',
                 'processing_result': processing_result,
