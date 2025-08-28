@@ -20,7 +20,10 @@ def start_complete_workflow(file_info, upload_id, clinic_id=None, patient_id=Non
                         celery.signature('process_medical_file', args=[upload_id]),
                         celery.signature('upload_medical_slices', args=[clinic_id, patient_id, report_type, report_id])
                     ),
-                    celery.signature('run_ai_analysis', args=[file_info, upload_id, clinic_id, patient_id, report_type, report_id])
+                    chain(
+                        celery.signature('run_ai_analysis', args=[file_info, upload_id, clinic_id, patient_id, report_type, report_id]),
+                        celery.signature('upload_report_to_storage')
+                    )
                 ),
                 celery.signature('aggregate_medical_results')
             )

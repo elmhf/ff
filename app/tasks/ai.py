@@ -14,7 +14,13 @@ def run_ai_analysis_task(self, validation_result, file_info, upload_id, clinic_i
                 return {
                     'status': 'skipped',
                     'message': 'AI analysis parameters not provided',
-                    'validation_result': validation_result
+                    'validation_result': validation_result,
+                    'file_info': file_info,
+                    'upload_id': upload_id,
+                    'clinic_id': clinic_id,
+                    'patient_id': patient_id,
+                    'report_type': report_type,
+                    'report_id': report_id
                 }
             
             # Update status to AI started
@@ -36,7 +42,13 @@ def run_ai_analysis_task(self, validation_result, file_info, upload_id, clinic_i
             result = {
                 'status': 'ai_completed',
                 'ai_result': ai_result,
-                'validation_result': validation_result
+                'validation_result': validation_result,
+                'file_info': file_info,
+                'upload_id': upload_id,
+                'clinic_id': clinic_id,
+                'patient_id': patient_id,
+                'report_type': report_type,
+                'report_id': report_id
             }
         JobStatusManager.create_or_update_status(task_id, 'completed', 'AI analysis completed', 100, result)
         return result
@@ -49,7 +61,13 @@ def run_ai_analysis_task(self, validation_result, file_info, upload_id, clinic_i
             'status': 'ai_failed',
             'ai_result': None,
             'error': error_msg,
-            'validation_result': validation_result
+            'validation_result': validation_result,
+            'file_info': file_info,
+            'upload_id': upload_id,
+            'clinic_id': clinic_id,
+            'patient_id': patient_id,
+            'report_type': report_type,
+            'report_id': report_id
         }
         JobStatusManager.create_or_update_status(task_id, 'completed', 'AI analysis failed but continuing', 100, result)
         return result
