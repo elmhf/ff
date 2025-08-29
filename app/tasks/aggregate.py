@@ -65,33 +65,22 @@ def aggregate_medical_results_task(self, results_list):
 
 
 @celery.task(bind=True, name='aggregate_pano_medical_results')
-def aggregate_pano_medical_results_task(self, results_list):
+def aggregate_pano_medical_results_task(self, results_list, file_info, upload_id, clinic_id, patient_id, report_id):
     task_id = self.request.id
     try:
         app = create_app()
         with app.app_context():
             # Update status to aggregation started
-            report_id = None
-            if isinstance(results_list, dict):
-                try:
-                    results_list = [results_list[k] for k in sorted(results_list.keys())]
-                except Exception:
-                    results_list = list(results_list.values())
-            elif not isinstance(results_list, list):
-                results_list = [results_list]
+            if report_id:
+                update_report_status(report_id, "aggregation_started")
+            
+            JobStatusManager.create_or_update_status(task_id, 'processing', 'Aggregating pano results...', 90)
 
+            # Extract the report upload result from the previous task
+            report_upload_result = results_list if isinstance(results_list, dict) else {}
+            
             def safe_get(d, key, default=None):
                 return d.get(key, default) if isinstance(d, dict) else default
-
-            validation_result = results_list[0] if len(results_list) > 0 else {}
-            upload_result = results_list[1] if len(results_list) > 1 else {}
-            ai_result = results_list[2] if len(results_list) > 2 else {}
-            report_upload_result = results_list[3] if len(results_list) > 3 else {}
-
-            report_id = (safe_get(validation_result, 'report_id') or
-                         safe_get(upload_result, 'report_id') or
-                         safe_get(ai_result, 'report_id') or
-                         safe_get(report_upload_result, 'report_id'))
             
             # Update status to aggregation started
             if report_id:
@@ -102,15 +91,16 @@ def aggregate_pano_medical_results_task(self, results_list):
             final_result = {
                 'status': 'completed',
                 'message': 'Panoramic image processing completed successfully',
-                'validation_result': validation_result,
-                'upload_result': safe_get(upload_result, 'upload_result'),
-                'ai_result': safe_get(ai_result, 'ai_result'),
+                'validation_result': 'Pano media validated successfully',
+                'upload_result': 'Pano image uploaded successfully',
+                'ai_result': 'Pano image analyzed successfully',
                 'report_upload_result': safe_get(report_upload_result, 'upload_result'),
-                'file_info': safe_get(validation_result, 'file_info'),
-                'clinic_id': safe_get(upload_result, 'clinic_id'),
-                'patient_id': safe_get(upload_result, 'patient_id'),
+                'file_info': file_info,
+                'clinic_id': clinic_id,
+                'patient_id': patient_id,
                 'report_type': 'pano',
-                'upload_id': safe_get(upload_result, 'upload_id') or safe_get(validation_result, 'upload_id'),
+                'upload_id': upload_id,
+                'report_id': report_id,
                 'workflow_completed': True
             }
 
