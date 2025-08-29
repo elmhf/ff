@@ -75,6 +75,7 @@ class SupabaseUploadManager:
         except Exception as e:
             return {"success": False, "error": f"File validation failed: {str(e)}"}
         storage_path = f"{clinic_id}/{patient_id}/{report_type.lower()}/{report_id}/{view}/{slice_index}.jpg"
+
         for attempt in range(self.max_retries):
             try:
                 with open(slice_path, 'rb') as f:

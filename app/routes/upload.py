@@ -34,7 +34,7 @@ def upload_medical_file():
         upload_id = request.form.get('upload_id', str(uuid.uuid4()))
         clinic_id = request.form.get('clinic_id')
         patient_id = request.form.get('patient_id')
-        report_type = request.form.get('report_type') or 'cbct'
+        report_type = request.form.get('report_type')
         report_id = request.form.get('report_id')
 
         if report_id:
@@ -66,7 +66,7 @@ def upload_medical_file():
             'file_size': file_size
         }
 
-        task_info = start_complete_workflow(file_info, upload_id, clinic_id, patient_id, report_id)
+        task_info = start_complete_workflow(file_info, upload_id, clinic_id, patient_id,report_type, report_id)
 
         return jsonify({
             'job_id': task_info['workflow_id'],
