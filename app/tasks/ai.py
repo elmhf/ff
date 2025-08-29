@@ -107,7 +107,7 @@ def analyze_pano_image(image_bytes: bytes, filename: str) -> dict:
 
 
 @celery.task(bind=True, name='analyze_pano_image')
-def analyze_pano_image_task(self, file_info, clinic_id, patient_id, report_id):
+def analyze_pano_image_task(self, upload_result, clinic_id, patient_id, report_id):
     task_id = self.request.id
     app = create_app()
     try:
@@ -116,6 +116,7 @@ def analyze_pano_image_task(self, file_info, clinic_id, patient_id, report_id):
                 update_report_status(report_id, "ai_started")
             JobStatusManager.create_or_update_status(task_id, 'processing', 'Analyzing panoramic image...', 40)
 
+            file_info = upload_result.get('file_info', {})
             image_path = (file_info or {}).get('path')
             filename = (file_info or {}).get('filename') or 'pano.jpg'
             if not image_path or not os.path.exists(image_path):

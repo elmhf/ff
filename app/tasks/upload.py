@@ -300,7 +300,7 @@ def upload_medical_slices_task(self, processing_result, clinic_id, patient_id, r
 
 
 @celery.task(bind=True, name='upload_pano_image')
-def upload_pano_image_task(self, file_info, clinic_id, patient_id, report_id):
+def upload_pano_image_task(self, validation_result, clinic_id, patient_id, report_id):
     task_id = self.request.id
     try:
         app = create_app()
@@ -309,6 +309,7 @@ def upload_pano_image_task(self, file_info, clinic_id, patient_id, report_id):
 
             try:
                 from app.services.uploads import SupabaseUploadManager
+                file_info = validation_result.get('file_info', {})
                 image_path = (file_info or {}).get('path')
                 filename = (file_info or {}).get('filename') or 'pano.jpg'
                 if not image_path or not os.path.exists(image_path):

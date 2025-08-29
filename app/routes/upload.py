@@ -270,7 +270,7 @@ def index():
         'status': 'running',
         'endpoints': {
             'cbct_upload': '/cbct-report-generated',
-            'pano_upload': '/pano-reports-generated',
+                         'pano_upload': '/pano-report-generated',
             '3d_upload': '/3d-report',
             'status': '/job-status/<job_id>',
             'health': '/health',
