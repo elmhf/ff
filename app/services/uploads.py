@@ -1,5 +1,6 @@
 import os
 import time
+import mimetypes
 from app.services.job_status import JobStatusManager
 from flask import current_app as app
 
@@ -93,4 +94,90 @@ class SupabaseUploadManager:
                     return {"success": False, "error": f"Upload failed after {self.max_retries} attempts: {str(e)}"}
         return {"success": False, "error": "Upload failed"}
 
+
+    def upload_pano_image(self, image_path, clinic_id, patient_id, report_id, content_type=None, max_size_bytes=50 * 1024 * 1024):
+        """Upload the original panoramic image to Supabase storage under the pano folder.
+
+        Storage path: reports/{clinic_id}/{patient_id}/pano/{report_id}/original<ext>
+        """
+        if not self.supabase:
+            raise Exception("Supabase client not available")
+        if not os.path.exists(image_path):
+            return {"success": False, "error": "Pano image file not found"}
+        try:
+            file_size = os.path.getsize(image_path)
+            if file_size == 0:
+                return {"success": False, "error": "Empty pano image file"}
+            if file_size > max_size_bytes:
+                return {"success": False, "error": "Pano image file too large"}
+        except Exception as e:
+            return {"success": False, "error": f"File validation failed: {str(e)}"}
+
+        _, ext = os.path.splitext(image_path)
+        ext = ext.lower() or ".jpg"
+        if not content_type:
+            guessed, _ = mimetypes.guess_type(image_path)
+            content_type = guessed or "image/jpeg"
+
+        storage_path = f"{clinic_id}/{patient_id}/pano/{report_id}/original{ext}"
+        for attempt in range(self.max_retries):
+            try:
+                with open(image_path, 'rb') as f:
+                    file_data = f.read()
+                result = self.supabase.storage.from_("reports").upload(
+                    path=storage_path,
+                    file=file_data,
+                    file_options={"content-type": content_type, "cache-control": "3600", "upsert": "true"}
+                )
+                if result:
+                    public_url = self.supabase.storage.from_("reports").get_public_url(storage_path)
+                    return {"success": True, "storage_path": storage_path, "public_url": public_url, "file_size": file_size}
+            except Exception as e:
+                if attempt < self.max_retries - 1:
+                    time.sleep(1 * (2 ** attempt))
+                else:
+                    return {"success": False, "error": f"Upload failed after {self.max_retries} attempts: {str(e)}"}
+        return {"success": False, "error": "Upload failed"}
+
+    def upload_pano_image_bytes(self, image_bytes, filename, clinic_id, patient_id, report_id, content_type=None, max_size_bytes=50 * 1024 * 1024):
+        """Upload the original panoramic image to Supabase storage from in-memory bytes.
+
+        Storage path: reports/{clinic_id}/{patient_id}/pano/{report_id}/original<ext>
+        """
+        if not self.supabase:
+            raise Exception("Supabase client not available")
+        if image_bytes is None:
+            return {"success": False, "error": "No image data provided"}
+        try:
+            file_size = len(image_bytes)
+            if file_size == 0:
+                return {"success": False, "error": "Empty pano image data"}
+            if file_size > max_size_bytes:
+                return {"success": False, "error": "Pano image file too large"}
+        except Exception as e:
+            return {"success": False, "error": f"Data validation failed: {str(e)}"}
+
+        _, ext = os.path.splitext(filename or "original.jpg")
+        ext = ext.lower() or ".jpg"
+        if not content_type:
+            guessed, _ = mimetypes.guess_type(filename or "original.jpg")
+            content_type = guessed or "image/jpeg"
+
+        storage_path = f"{clinic_id}/{patient_id}/pano/{report_id}/original{ext}"
+        for attempt in range(self.max_retries):
+            try:
+                result = self.supabase.storage.from_("reports").upload(
+                    path=storage_path,
+                    file=image_bytes,
+                    file_options={"content-type": content_type, "cache-control": "3600", "upsert": "true"}
+                )
+                if result:
+                    public_url = self.supabase.storage.from_("reports").get_public_url(storage_path)
+                    return {"success": True, "storage_path": storage_path, "public_url": public_url, "file_size": file_size}
+            except Exception as e:
+                if attempt < self.max_retries - 1:
+                    time.sleep(1 * (2 ** attempt))
+                else:
+                    return {"success": False, "error": f"Upload failed after {self.max_retries} attempts: {str(e)}"}
+        return {"success": False, "error": "Upload failed"}
 

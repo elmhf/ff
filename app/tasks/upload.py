@@ -298,6 +298,54 @@ def upload_medical_slices_task(self, processing_result, clinic_id, patient_id, r
         self.update_state(state='FAILURE', meta={'error': error_msg})
         raise
 
+
+@celery.task(bind=True, name='upload_pano_image')
+def upload_pano_image_task(self, file_info, clinic_id, patient_id, report_id):
+    task_id = self.request.id
+    try:
+        app = create_app()
+        with app.app_context():
+            JobStatusManager.create_or_update_status(task_id, 'processing', 'Uploading pano image...', 20)
+
+            try:
+                from app.services.uploads import SupabaseUploadManager
+                image_path = (file_info or {}).get('path')
+                filename = (file_info or {}).get('filename') or 'pano.jpg'
+                if not image_path or not os.path.exists(image_path):
+                    raise FileNotFoundError('Pano image path not found')
+                with open(image_path, 'rb') as f:
+                    image_bytes = f.read()
+
+                uploader = SupabaseUploadManager(task_id=task_id)
+                upload_result = uploader.upload_pano_image_bytes(
+                    image_bytes=image_bytes,
+                    filename=filename,
+                    clinic_id=clinic_id,
+                    patient_id=patient_id,
+                    report_id=report_id
+                )
+            except Exception as e:
+                upload_result = {"success": False, "error": str(e)}
+
+            status = 'uploaded' if upload_result.get('success') else 'skipped'
+            result = {
+                'status': status,
+                'message': 'Pano image uploaded to storage' if upload_result.get('success') else 'Pano image upload failed or skipped',
+                'file_info': file_info,
+                'clinic_id': clinic_id,
+                'patient_id': patient_id,
+                'report_type': 'pano',
+                'report_id': report_id,
+                'upload_result': upload_result
+            }
+            JobStatusManager.create_or_update_status(task_id, 'completed', 'Pano image upload finished', 40, result)
+            return result
+    except Exception as e:
+        error_msg = f"Pano image upload error: {str(e)}"
+        JobStatusManager.create_or_update_status(task_id, 'failed', error_msg, 0)
+        self.update_state(state='FAILURE', meta={'error': error_msg})
+        raise
+
 @celery.task(bind=True, name='upload_report_to_storage')
 def upload_report_to_storage_task(self, ai_result):
     task_id = self.request.id
