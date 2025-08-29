@@ -34,7 +34,7 @@ def upload_medical_file():
         upload_id = request.form.get('upload_id', str(uuid.uuid4()))
         clinic_id = request.form.get('clinic_id')
         patient_id = request.form.get('patient_id')
-        report_type = request.form.get('report_type')
+        report_type = request.form.get('report_type') or 'cbct'
         report_id = request.form.get('report_id')
 
         if report_id:
