@@ -84,7 +84,7 @@ def upload_medical_file():
         return jsonify({'error': 'Internal server error'}), 500
 
 
-@upload_bp.route('/pano-reports-generated', methods=['POST'])
+@upload_bp.route('/pano-report-generated', methods=['POST'])
 def upload_pano_report():
     try:
         if 'file' not in request.files:
@@ -172,8 +172,8 @@ def upload_pano_report():
             'pano_image_upload': upload_image_result
         }
 
-        task_info = start_pano_workflow(file_info, upload_id, clinic_id, patient_id, report_type, report_id)
-
+        task_info = start_pano_workflow(file_info, upload_id, clinic_id, patient_id, report_id)
+        print("------- task inf 99999 ",task_info)
         return jsonify({
             'job_id': task_info['workflow_id'],
             'status': 'queued',
@@ -186,6 +186,7 @@ def upload_pano_report():
                 'pano_image_public_url': upload_image_result.get('public_url') if isinstance(upload_image_result, dict) else None
             }
         }), 202
+
     except Exception as e:
         logger.error(f"Error in /pano-reports: {e}")
         return jsonify({'error': 'Internal server error'}), 500
