@@ -57,7 +57,8 @@ def start_pano_workflow(file_info, upload_id, clinic_id=None, patient_id=None, r
                 celery.signature('validate_pano_media', args=[file_info, report_id]),
                 celery.signature('upload_pano_image', args=[clinic_id, patient_id, report_id]),
                 celery.signature('analyze_pano_image', args=[clinic_id, patient_id, report_id]),
-                celery.signature('upload_report_to_storage')
+                celery.signature('upload_report_to_storage'),
+                celery.signature('aggregate_pano_medical_results')
             )
 
             workflow_result = workflow.apply_async()
