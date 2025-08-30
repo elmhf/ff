@@ -312,10 +312,16 @@ def upload_pano_image_task(self, validation_result, clinic_id, patient_id, repor
                 file_info = validation_result.get('file_info', {})
                 image_path = (file_info or {}).get('path')
                 filename = (file_info or {}).get('filename') or 'pano.jpg'
+                
+                print(f"DEBUG: Pano upload - image_path: {image_path}, filename: {filename}")
+                
                 if not image_path or not os.path.exists(image_path):
-                    raise FileNotFoundError('Pano image path not found')
+                    raise FileNotFoundError(f'Pano image path not found: {image_path}')
+                
                 with open(image_path, 'rb') as f:
                     image_bytes = f.read()
+                
+                print(f"DEBUG: Pano upload - read {len(image_bytes)} bytes from {image_path}")
 
                 uploader = SupabaseUploadManager(task_id=task_id)
                 upload_result = uploader.upload_pano_image_bytes(

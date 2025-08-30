@@ -155,16 +155,39 @@ class SupabaseUploadManager:
                 return {"success": False, "error": "Empty pano image data"}
             if file_size > max_size_bytes:
                 return {"success": False, "error": "Pano image file too large"}
+            
+            # Validate that the bytes represent a valid image
+            if len(image_bytes) < 8:
+                return {"success": False, "error": "Image data too short to be valid"}
+            
+            # Check for common image headers
+            header = image_bytes[:8]
+            valid_headers = [
+                b'\xff\xd8\xff',  # JPEG
+                b'\x89PNG\r\n\x1a\n',  # PNG
+                b'II*\x00',  # TIFF little-endian
+                b'MM\x00*',  # TIFF big-endian
+                b'BM',  # BMP
+                b'GIF87a',  # GIF
+                b'GIF89a'   # GIF
+            ]
+            
+            is_valid_image = any(header.startswith(h) for h in valid_headers)
+            if not is_valid_image:
+                return {"success": False, "error": "Invalid image format - unrecognized header"}
+                
         except Exception as e:
             return {"success": False, "error": f"Data validation failed: {str(e)}"}
 
-        _, ext = os.path.splitext(filename or "original.jpg")
-        ext = ext.lower() or ".jpg"
-        if not content_type:
-            guessed, _ = mimetypes.guess_type(filename or "original.jpg")
-            content_type = guessed or "image/jpeg"
+        # Simplify: always use PNG format for better compatibility
+        ext = '.png'
+        content_type = 'image/png'
 
         storage_path = f"{clinic_id}/{patient_id}/pano/{report_id}/original{ext}"
+        
+        # Add debug logging
+        print(f"DEBUG: Uploading pano image - size: {file_size}, ext: {ext}, content_type: {content_type}, path: {storage_path}")
+        
         for attempt in range(self.max_retries):
             try:
                 result = self.supabase.storage.from_("reports").upload(
@@ -176,6 +199,7 @@ class SupabaseUploadManager:
                     public_url = self.supabase.storage.from_("reports").get_public_url(storage_path)
                     return {"success": True, "storage_path": storage_path, "public_url": public_url, "file_size": file_size}
             except Exception as e:
+                print(f"DEBUG: Upload attempt {attempt + 1} failed: {str(e)}")
                 if attempt < self.max_retries - 1:
                     time.sleep(1 * (2 ** attempt))
                 else:
