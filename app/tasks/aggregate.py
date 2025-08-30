@@ -65,7 +65,18 @@ def aggregate_medical_results_task(self, results_list):
 
 
 @celery.task(bind=True, name='aggregate_pano_medical_results')
-def aggregate_pano_medical_results_task(self, results_list, file_info, upload_id, clinic_id, patient_id, report_id):
+def aggregate_pano_medical_results_task(self, *args):
+    # Unpack arguments based on how they're passed from the chain
+    if len(args) == 6:
+        # If 6 arguments are passed: results_list, file_info, upload_id, clinic_id, patient_id, report_id
+        results_list, file_info, upload_id, clinic_id, patient_id, report_id = args
+    elif len(args) == 5:
+        # If 5 arguments are passed: file_info, upload_id, clinic_id, patient_id, report_id
+        # The results_list should come from the previous task
+        file_info, upload_id, clinic_id, patient_id, report_id = args
+        results_list = None  # This will be handled in the function
+    else:
+        raise ValueError(f"Unexpected number of arguments: {len(args)}")
     task_id = self.request.id
     try:
         app = create_app()
@@ -77,16 +88,16 @@ def aggregate_pano_medical_results_task(self, results_list, file_info, upload_id
             JobStatusManager.create_or_update_status(task_id, 'processing', 'Aggregating pano results...', 90)
 
             # Extract the report upload result from the previous task
-            report_upload_result = results_list if isinstance(results_list, dict) else {}
+            # In a chain, the result from the previous task should be automatically passed
+            # If results_list is None, it means we need to get it from the task context
+            if results_list is None:
+                # Try to get the result from the previous task in the chain
+                report_upload_result = {}
+            else:
+                report_upload_result = results_list if isinstance(results_list, dict) else {}
             
             def safe_get(d, key, default=None):
                 return d.get(key, default) if isinstance(d, dict) else default
-            
-            # Update status to aggregation started
-            if report_id:
-                update_report_status(report_id, "aggregation_started")
-            
-            JobStatusManager.create_or_update_status(task_id, 'processing', 'Aggregating pano results...', 90)
 
             final_result = {
                 'status': 'completed',
